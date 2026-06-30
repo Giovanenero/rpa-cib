@@ -5,6 +5,7 @@ from pathlib import Path
 from pymongo import MongoClient
 import pyperclip
 from dotenv import load_dotenv
+from enum import Enum
 
 load_dotenv()
 
@@ -144,17 +145,17 @@ def fazer_nova_consulta():
     return True
 
 
-def verificar_certidao_valida_encontrada(cib: str) -> str | None:
+def verificar_certidao_valida_encontrada(cib: str) -> bool | None:
 
     position = localizar_imagem(os.path.join(FOLDER_PATH, '4-certidao_valida_encontrada.png'), confidence=0.8)
     if not position:
         print("Certidão válida não encontrada.")    
-        return None
+        return False
     
     position = localizar_imagem(os.path.join(FOLDER_PATH, '5-consultar_certidao.png'), confidence=0.8)
     if not position:
         print("Botão de consultar certidão não encontrado.")
-        return False
+        return None
 
     x = position.x + random.randint(-8, 8) - position.x / 4
     y = position.y + random.randint(-4, 4)
@@ -173,7 +174,7 @@ def verificar_certidao_valida_encontrada(cib: str) -> str | None:
     position = localizar_imagem(os.path.join(FOLDER_PATH, '6-data_validade.png'), confidence=0.8)
     if not position:
         print("Filtro de data de validade não encontrado.")
-        return False
+        return None
     
     x = position.x + random.randint(-8, 8)
     y = position.y + random.randint(-4, 4)
@@ -188,7 +189,7 @@ def verificar_certidao_valida_encontrada(cib: str) -> str | None:
     position = localizar_imagem(os.path.join(FOLDER_PATH, '7-consultar_certidao.png'), confidence=0.8)
     if not position:
         print("Botão de consultar certidão não encontrado.")
-        return False
+        return None
     
     x = position.x + random.randint(-8, 8)
     y = position.y + random.randint(-4, 4)
@@ -202,7 +203,7 @@ def verificar_certidao_valida_encontrada(cib: str) -> str | None:
     resultados = list(pyautogui.locateAllOnScreen(os.path.join(FOLDER_PATH, '8-baixar_2_via.png'), confidence=0.9))
     if not resultados:
         print("Botão de baixar 2ª via não encontrado.")
-        return False
+        return None
     
     position = resultados[0]
     position = pyautogui.center(position)
@@ -302,8 +303,7 @@ def parse_pdf(file_path: str, cib: str) -> dict | None:
             os.remove(file_path)
 
 
-def capturar_erro() -> str | None:
-
+def capturar_mensagem(cib :str) -> str | None:
     pyautogui.press("end")
     time.sleep(0.5)
 
@@ -320,10 +320,12 @@ def capturar_erro() -> str | None:
     time.sleep(random.uniform(0.3, 0.8))
     texto = pyperclip.paste()
     lines = [line.strip() for line in texto.split('\n') if line.strip()]
-    index = next((index for index, line in enumerate(lines) if line.lower().startswith("avaliar serviço")), None)
-    if not lines:
+    cib_line = f"{cib[:1]}.{cib[1:4]}.{cib[4:7]}-{cib[7:10]}"
+    start_line = next((index for index, line in enumerate(lines) if cib_line in line), None)
+    end_line = next((index for index, line in enumerate(lines) if line.lower().startswith("avaliar serviço")), None)
+    if start_line is None or end_line is None:
         return None
-    lines = lines[10:index]
+    lines = lines[start_line + 1:end_line]
     texto = "\n".join(lines)
 
     pyautogui.moveTo(largura / 2, altura - 200, duration=random.uniform(0.1, 0.4))
@@ -341,13 +343,18 @@ def extract_cib(cib: str, chrome=None, fechar_chrome=True) -> tuple[dict, str]:
 
     file_path = os.path.join(DOWNLOADS, f"Certidao-{cib}.pdf")
 
+    if baixou is False:
+        texto = capturar_mensagem(cib)
+        if 'sucesso' in texto.lower():
+            baixou = True
+
     if baixou or baixou is None:
         # verifica se baixou(1 emissão)
         if esperar_download(file_path, timeout=2):
             data = parse_pdf(file_path, cib)
 
-    if not data:
-        texto = capturar_erro()
+        if not data:
+            texto = capturar_mensagem(cib)
     
     if fechar_chrome:
         chrome.terminate()   # Fecha o processo
