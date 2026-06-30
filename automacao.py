@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+pyautogui.FAILSAFE = False
 
 url = os.getenv("URL_SITE")
 FOLDER_PATH = 'imgs'
@@ -308,7 +309,9 @@ def capturar_erro() -> str | None:
     time.sleep(random.uniform(0.3, 0.8))
     texto = pyperclip.paste()
     lines = [line.strip() for line in texto.split('\n') if line.strip()]
-    index = next(index for index, line in enumerate(lines) if line.lower().startswith("avaliar serviço"))
+    index = next((index for index, line in enumerate(lines) if line.lower().startswith("avaliar serviço")), None)
+    if not lines:
+        return None
     lines = lines[10:index]
     texto = "\n".join(lines)
 
@@ -401,9 +404,10 @@ def main():
             if datas_error:
                 COLLECTION_AGRO_ERROR.insert_many(datas_error)
 
-            
+            datas = []
+            datas_pdf = []
+            datas_error = []
 
-    
 
 if __name__ == "__main__":
     main()
