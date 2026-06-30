@@ -1,4 +1,4 @@
-import pyautogui, subprocess, PyPDF2, tempfile
+import pyautogui, subprocess, PyPDF2, tempfile, shutil
 import time, os, random, re, io, base64
 from tenacity import retry, stop_after_attempt, wait_fixed
 from pathlib import Path
@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-pyautogui.FAILSAFE = False
+pyautogui.FAILSAFE = True
 
 url = os.getenv("URL_SITE")
 FOLDER_PATH = 'imgs'
@@ -352,61 +352,71 @@ def extract_cib(cib: str, chrome=None, fechar_chrome=True) -> tuple[dict, str]:
 
 
 def main(): 
+    CLIENT_AGRO = None
+    processo = None
+    try:
+        CLIENT_AGRO = MongoClient(os.getenv("URI_AGRO"))
+        DATABASE_AGRO = CLIENT_AGRO["AGRONEGOCIO"]
+        COLLECTION_AGRO = DATABASE_AGRO["CAFIR_ld"]
+        COLLECTION_AGRO_PDF = DATABASE_AGRO["CAFIR_PDF_ld"]
+        COLLECTION_AGRO_ERROR = DATABASE_AGRO["CAFIR_ERROR_ld"]
 
-    CLIENT_AGRO = MongoClient(os.getenv("URI_AGRO"))
-    DATABASE_AGRO = CLIENT_AGRO["AGRONEGOCIO"]
-    COLLECTION_AGRO = DATABASE_AGRO["CAFIR_ld"]
-    COLLECTION_AGRO_PDF = DATABASE_AGRO["CAFIR_PDF_ld"]
-    COLLECTION_AGRO_ERROR = DATABASE_AGRO["CAFIR_ERROR_ld"]
-
-    doc = COLLECTION_AGRO.find_one(
-        {"CIB": {"$ne": None}},
-        {"_id": 0, "CIB": 1},
-        sort=[("CIB", -1)]
-    )
-
-    cib = doc['CIB'] if doc else None
-    
-    filter = {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None, '$gt': cib}} if cib else {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None}}
-    docs = COLLECTION.find(filter, {'_id': 0, 'NR_IMOVEL': 1, 'SG_UF': 1}).sort([('SG_UF', 1), ('NR_IMOVEL', 1)])    
-    cibs = [doc['NR_IMOVEL'] for doc in docs]
-    
-    processo = acessar_site(url, processo=None)
-
-    datas = []
-    datas_pdf = []
-    datas_error = []
-
-    for index, cib in enumerate(cibs):
-    
-        data, texto = extract_cib(
-            cib, 
-            chrome=processo, 
-            fechar_chrome=False
+        doc = COLLECTION_AGRO.find_one(
+            {"CIB": {"$ne": None}},
+            {"_id": 0, "CIB": 1},
+            sort=[("CIB", -1)]
         )
 
-        if not data:
-            datas_error.append({'CIB': cib, 'ERRO': texto})
+        cib = doc['CIB'] if doc else None
         
-        else:
-            datas_pdf.append({'CPF_CNPJ': data['CPF_CNPJ'], 'PDF': data['PDF']})
-            datas.append({k: v for k, v in data.items() if k != 'PDF'})
+        filter = {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None, '$gt': cib}} if cib else {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None}}
+        docs = COLLECTION.find(filter, {'_id': 0, 'NR_IMOVEL': 1, 'SG_UF': 1}).sort([('SG_UF', 1), ('NR_IMOVEL', 1)])    
+        cibs = [doc['NR_IMOVEL'] for doc in docs]
+        
+        processo = acessar_site(url, processo=None)
 
-        if (index + 1)%10 == 0 or not fazer_nova_consulta():
-            processo = acessar_site(url, processo=processo)
-            
-            if datas:
-                COLLECTION_AGRO.insert_many(datas)
-            
-            if datas_pdf:
-                COLLECTION_AGRO_PDF.insert_many(datas_pdf)
+        for index, cib in enumerate(cibs):
+            data, texto = extract_cib(
+                cib, 
+                chrome=processo, 
+                fechar_chrome=False
+            )
 
-            if datas_error:
-                COLLECTION_AGRO_ERROR.insert_many(datas_error)
+            if not data:
+                try:
+                    COLLECTION_AGRO_ERROR.insert_one({'CIB': cib, 'ERRO': texto})
+                except Exception as db_err:
+                    print(f"Erro ao registrar erro no banco para CIB {cib}: {db_err}")
+            else:
+                try:
+                    COLLECTION_AGRO_PDF.insert_one({'CPF_CNPJ': data['CPF_CNPJ'], 'PDF': data['PDF']})
+                    data_without_pdf = {k: v for k, v in data.items() if k != 'PDF'}
+                    COLLECTION_AGRO.insert_one(data_without_pdf)
+                except Exception as db_err:
+                    print(f"Erro ao salvar dados no banco para CIB {cib}: {db_err}")
 
-            datas = []
-            datas_pdf = []
-            datas_error = []
+            if (index + 1) % 10 == 0 or not fazer_nova_consulta():
+                processo = acessar_site(url, processo=processo)
+
+    finally:
+        # Fechar o processo do Chrome se ainda estiver aberto
+        if processo and processo.poll() is None:
+            print("Finalizando processo do Chrome...")
+            processo.terminate()
+            processo.wait()
+
+        # Limpar o diretório temporário do perfil do Chrome
+        if 'PERFIL' in globals() and os.path.exists(PERFIL):
+            print("Limpando diretório temporário do perfil...")
+            shutil.rmtree(PERFIL, ignore_errors=True)
+
+        # Fechar conexões do MongoDB
+        if CLIENT_AGRO:
+            print("Fechando conexão CLIENT_AGRO...")
+            CLIENT_AGRO.close()
+        if 'CLIENT' in globals() and CLIENT:
+            print("Fechando conexão CLIENT...")
+            CLIENT.close()
 
 
 if __name__ == "__main__":
