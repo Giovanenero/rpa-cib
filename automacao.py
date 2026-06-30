@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-pyautogui.FAILSAFE = True
+pyautogui.FAILSAFE = False
 
 url = os.getenv("URL_SITE")
 FOLDER_PATH = 'imgs'
@@ -372,6 +372,13 @@ def main():
             sort=[("CIB", -1)]
         )
 
+        doc_error = COLLECTION_AGRO_ERROR.find_one(
+            {"CIB": {"$ne": None}},
+            {"_id": 0, "CIB": 1},
+            sort=[("CIB", -1)]
+        )
+
+        doc = doc if doc and (not doc_error or doc['CIB'] > doc_error['CIB']) else doc_error
         cib = doc['CIB'] if doc else None
         
         filter = {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None, '$gt': cib}} if cib else {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None}}
