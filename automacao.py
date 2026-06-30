@@ -303,8 +303,19 @@ def parse_pdf(file_path: str, cib: str) -> dict | None:
 
 
 def capturar_erro() -> str | None:
+
+    pyautogui.press("end")
+    time.sleep(0.5)
+
+    largura, altura = pyautogui.size()
+
+    pyautogui.moveTo(largura / 2, altura - 200, duration=random.uniform(0.3, 0.8))
+    pyautogui.click()
+    time.sleep(random.uniform(0.2, 0.4))
+
     pyautogui.hotkey("ctrl", "a")
     time.sleep(random.uniform(0.3, 0.8))
+
     pyautogui.hotkey("ctrl", "c")
     time.sleep(random.uniform(0.3, 0.8))
     texto = pyperclip.paste()
@@ -315,15 +326,9 @@ def capturar_erro() -> str | None:
     lines = lines[10:index]
     texto = "\n".join(lines)
 
-    pyautogui.press("end")
-    time.sleep(0.5)
-
-    largura, altura = pyautogui.size()
-
-    pyautogui.moveTo(largura / 2, altura - 200, duration=random.uniform(0.3, 0.8))
+    pyautogui.moveTo(largura / 2, altura - 200, duration=random.uniform(0.1, 0.4))
     pyautogui.click()
     return texto
-
 
 def extract_cib(cib: str, chrome=None, fechar_chrome=True) -> tuple[dict, str]:
     
