@@ -44,7 +44,7 @@ def digitar_humanizado(texto: str, intervalo_min: float = 0.04, intervalo_max: f
         pyautogui.write(caractere, interval=random.uniform(intervalo_min, intervalo_max))
 
 
-def acessar_site(url: str, processo=None):
+def acessar_site(url: str, processo=None, proxy:bool=True):
     chrome = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
     extensao = r"C:\Users\SeuUsuario\Desktop\iproyal_proxy"
 
@@ -52,26 +52,27 @@ def acessar_site(url: str, processo=None):
     if processo and processo.poll() is None:
         processo.terminate()
         processo.wait()
-
-    # abre um processo novo
-    #processo = subprocess.Popen([
-    #    chrome,
-    #    f"--user-data-dir={PERFIL}",
-    #    "--start-maximized",
-    #    "--no-first-run",
-    #    "--no-default-browser-check",
-    #    url
-    #])
-
-    processo = subprocess.Popen([
-        chrome,
-        f"--load-extension={extensao}",
-        f"--user-data-dir={PERFIL}",
-        "--start-maximized",
-        "--no-first-run",
-        "--no-default-browser-check",
-        url
-    ])
+    
+    if not proxy:
+        processo = subprocess.Popen([
+            chrome,
+            f"--user-data-dir={PERFIL}",
+            "--start-maximized",
+            "--no-first-run",
+            "--no-default-browser-check",
+            url
+        ])
+    
+    else:
+        processo = subprocess.Popen([
+            chrome,
+            f"--load-extension={extensao}",
+            f"--user-data-dir={PERFIL}",
+            "--start-maximized",
+            "--no-first-run",
+            "--no-default-browser-check",
+            url
+        ])
 
     time.sleep(2)
 
@@ -465,11 +466,10 @@ def main():
 
         print(f'{len(cibs)} cibs restantes')
 
-        processo = acessar_site(url, processo=None)
-        #acessar_site_v2(url)
+        proxy = False
+        processo = acessar_site(url, processo=None, proxy=proxy)
 
         for index, cib in enumerate(cibs):
-            #acessar_site_v2(url)
 
             data, texto = extract_cib(
                 cib, 
@@ -493,8 +493,8 @@ def main():
 
 
             if (index + 1) % 10 == 0 or not fazer_nova_consulta():
-                processo = acessar_site(url, processo=processo)
-                #acessar_site_v2(url)
+                proxy= not proxy
+                processo = acessar_site(url, processo=processo, proxy=proxy)
 
     finally:
         # Fechar o processo do Chrome se ainda estiver aberto
