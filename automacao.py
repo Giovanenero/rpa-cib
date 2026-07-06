@@ -5,7 +5,7 @@ from pathlib import Path
 from pymongo import MongoClient
 import pyperclip
 from dotenv import load_dotenv
-from enum import Enum
+import pygetwindow as gw
 
 load_dotenv()
 
@@ -22,7 +22,7 @@ DATABASE = CLIENT["RECEITA_FEDERAL"]
 COLLECTION = DATABASE["CAFIR"]
 
 @retry(stop=stop_after_attempt(10), wait=wait_fixed(0.5),     retry_error_callback=lambda retry_state: None)
-def localizar_imagem(imagem, confidence=0.9, grayscale=False):
+def localizar_imagem(imagem, confidence=0.7, grayscale=False):
     return pyautogui.locateCenterOnScreen(
         imagem,
         confidence=confidence,
@@ -46,6 +46,7 @@ def digitar_humanizado(texto: str, intervalo_min: float = 0.04, intervalo_max: f
 
 def acessar_site(url: str, processo=None):
     chrome = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+    extensao = r"C:\Users\SeuUsuario\Desktop\iproyal_proxy"
 
     # fecha o processo
     if processo and processo.poll() is None:
@@ -53,8 +54,18 @@ def acessar_site(url: str, processo=None):
         processo.wait()
 
     # abre um processo novo
+    #processo = subprocess.Popen([
+    #    chrome,
+    #    f"--user-data-dir={PERFIL}",
+    #    "--start-maximized",
+    #    "--no-first-run",
+    #    "--no-default-browser-check",
+    #    url
+    #])
+
     processo = subprocess.Popen([
         chrome,
+        f"--load-extension={extensao}",
         f"--user-data-dir={PERFIL}",
         "--start-maximized",
         "--no-first-run",
@@ -64,15 +75,56 @@ def acessar_site(url: str, processo=None):
 
     time.sleep(2)
 
+    # tela o chrome
+    #for janela in gw.getWindowsWithTitle("Chrome"):
+    #    try:
+    #        if janela.isMinimized:
+    #            janela.restore()
+    #        janela.activate()
+    #        janela.maximize()
+    #    except Exception:
+    #        pass
+    #    break
+
+    #pyautogui.hotkey("win", "1")
+
     aceitar_cookies()
 
     return processo
 
 
+def acessar_site_v2(url):
+    try:
+
+        subprocess.run(["taskkill", "/F", "/IM", "chrome.exe"])
+        time.sleep(0.3)
+
+        pyautogui.hotkey("win", "1")
+        time.sleep(0.5)
+
+        pyautogui.hotkey("ctrl", "l")
+        time.sleep(0.3)
+
+        pyautogui.write(url, interval=0.05)
+        time.sleep(0.3)
+        pyautogui.press("enter")
+
+        time.sleep(2)
+
+        aceitar_cookies()
+
+        return True
+
+    except Exception as e:
+        print(f'Erro ao acessar site: {str(e)}')
+
+    return False
+
+
 def aceitar_cookies():
     time.sleep(random.uniform(1.5, 2.8))
     
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '1-aceitar_cookies.png'), confidence=0.9)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '1-aceitar_cookies.png'), confidence=0.7)
 
     if position is None:
         print("Botão de aceitar cookies não encontrado.")
@@ -94,7 +146,7 @@ def aceitar_cookies():
 
 def pesquisar_cib(cib: str):
 
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '2-informa_cib.png'), confidence=0.8)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '2-informa_cib.png'), confidence=0.7)
     if not position:
         print("Campo de pesquisa CIB não encontrado.")
         return False
@@ -110,7 +162,7 @@ def pesquisar_cib(cib: str):
 
     digitar_humanizado(cib)
 
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '3-emitir_certidao.png'), confidence=0.8)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '3-emitir_certidao.png'), confidence=0.7)
     if not position:
         print("Botão de emitir certidão não encontrado.")
         return False
@@ -130,7 +182,7 @@ def fazer_nova_consulta():
     pyautogui.press("end")
     time.sleep(0.5)
 
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '10-nova_consulta.png'), confidence=0.8)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '10-nova_consulta.png'), confidence=0.7)
     if not position:
         print("Botão de nova consulta não encontrado.")
         return False
@@ -147,12 +199,12 @@ def fazer_nova_consulta():
 
 def verificar_certidao_valida_encontrada(cib: str) -> bool | None:
 
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '4-certidao_valida_encontrada.png'), confidence=0.8)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '4-certidao_valida_encontrada.png'), confidence=0.7)
     if not position:
         print("Certidão válida não encontrada.")    
         return False
     
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '5-consultar_certidao.png'), confidence=0.8)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '5-consultar_certidao.png'), confidence=0.7)
     if not position:
         print("Botão de consultar certidão não encontrado.")
         return None
@@ -171,7 +223,7 @@ def verificar_certidao_valida_encontrada(cib: str) -> bool | None:
     time.sleep(0.5)
 
     # filtra pela data de validade
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '6-data_validade.png'), confidence=0.8)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '6-data_validade.png'), confidence=0.7)
     if not position:
         print("Filtro de data de validade não encontrado.")
         return None
@@ -186,7 +238,7 @@ def verificar_certidao_valida_encontrada(cib: str) -> bool | None:
     time.sleep(0.5)
 
     # consultar certidão valida
-    position = localizar_imagem(os.path.join(FOLDER_PATH, '7-consultar_certidao.png'), confidence=0.8)
+    position = localizar_imagem(os.path.join(FOLDER_PATH, '7-consultar_certidao.png'), confidence=0.7)
     if not position:
         print("Botão de consultar certidão não encontrado.")
         return None
@@ -200,19 +252,41 @@ def verificar_certidao_valida_encontrada(cib: str) -> bool | None:
     pyautogui.scroll(-200)
     time.sleep(0.5)
 
-    resultados = list(pyautogui.locateAllOnScreen(os.path.join(FOLDER_PATH, '8-baixar_2_via.png'), confidence=0.9))
-    if not resultados:
-        print("Botão de baixar 2ª via não encontrado.")
-        return None
-    
-    position = resultados[0]
-    position = pyautogui.center(position)
-    x = position.x + random.randint(-4, 4)
-    y = position.y + random.randint(-4, 4)
-    pyautogui.moveTo(x, y, duration=random.uniform(0.3, 0.8))
-    time.sleep(random.uniform(0.1, 0.4))
-    pyautogui.click()
-    time.sleep(random.uniform(0.3, 0.8))
+    try:
+        resultados = list(pyautogui.locateAllOnScreen(os.path.join(FOLDER_PATH, '8-baixar_2_via.png'), confidence=0.7))
+        if not resultados:
+            print("Botão de baixar 2ª via não encontrado.")
+            return None
+
+        position = resultados[0]
+        position = pyautogui.center(position)
+        x = position.x + random.randint(-4, 4)
+        y = position.y + random.randint(-4, 4)
+        pyautogui.moveTo(x, y, duration=random.uniform(0.3, 0.8))
+        time.sleep(random.uniform(0.1, 0.4))
+        pyautogui.click()
+        time.sleep(random.uniform(0.3, 0.8))
+
+    except:
+        resultados = list(pyautogui.locateAllOnScreen(os.path.join(FOLDER_PATH, '11-valida.png'), confidence=0.7))
+        if not resultados:
+            print("Certidão valida não encontrado.")
+            return None
+        
+        position = resultados[0]
+        position = pyautogui.center(position)
+        x = position.x + random.randint(-4, 4)
+        y = position.y + random.randint(-4, 4)
+        pyautogui.moveTo(x, y, duration=random.uniform(0.3, 0.8))
+        time.sleep(random.uniform(0.1, 0.4))
+        pyautogui.click()
+        time.sleep(random.uniform(0.3, 0.8))
+
+        pyautogui.press("tab")
+        time.sleep(0.2)
+        pyautogui.press("enter")
+        time.sleep(0.5)
+
 
     pyautogui.scroll(500)
     time.sleep(0.5)
@@ -253,7 +327,9 @@ def parse_pdf(file_path: str, cib: str) -> dict | None:
 
         line = get_line(lines, "município")
         if line:
-            data["NM_MUNICIPIO"] = line.split(":")[1].strip()
+            data["NM_MUNICIPIO"] = line.split(":")[1]
+            if data["NM_MUNICIPIO"].endswith(" UF"):
+                data["NM_MUNICIPIO"] = data["NM_MUNICIPIO"].replace(" UF", '')
             data["UF"] = line.split(":")[2].strip()
 
         #line = get_line(lines, "cpf")
@@ -332,6 +408,7 @@ def capturar_mensagem(cib :str) -> str | None:
     pyautogui.click()
     return texto
 
+
 def extract_cib(cib: str, chrome=None, fechar_chrome=True) -> tuple[dict, str]:
     
     data, texto = None, None
@@ -345,7 +422,7 @@ def extract_cib(cib: str, chrome=None, fechar_chrome=True) -> tuple[dict, str]:
 
     if baixou is False:
         texto = capturar_mensagem(cib)
-        if 'sucesso' in texto.lower():
+        if 'sucesso' in str(texto).lower():
             baixou = True
 
     if baixou or baixou is None:
@@ -372,29 +449,28 @@ def main():
         COLLECTION_AGRO = DATABASE_AGRO["CAFIR_ld"]
         COLLECTION_AGRO_PDF = DATABASE_AGRO["CAFIR_PDF_ld"]
         COLLECTION_AGRO_ERROR = DATABASE_AGRO["CAFIR_ERROR_ld"]
-
-        doc = COLLECTION_AGRO.find_one(
-            {"CIB": {"$ne": None}},
-            {"_id": 0, "CIB": 1},
-            sort=[("CIB", -1)]
-        )
-
-        doc_error = COLLECTION_AGRO_ERROR.find_one(
-            {"CIB": {"$ne": None}},
-            {"_id": 0, "CIB": 1},
-            sort=[("CIB", -1)]
-        )
-
-        doc = doc if doc and (not doc_error or doc['CIB'] > doc_error['CIB']) else doc_error
-        cib = doc['CIB'] if doc else None
         
-        filter = {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None, '$gt': cib}} if cib else {'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None}}
-        docs = COLLECTION.find(filter, {'_id': 0, 'NR_IMOVEL': 1, 'SG_UF': 1}).sort([('SG_UF', 1), ('NR_IMOVEL', 1)])    
-        cibs = [doc['NR_IMOVEL'] for doc in docs]
-        
+        docs = COLLECTION.find({'SG_UF': 'SC', 'NR_IMOVEL': {'$ne': None}}, {'_id': 0, 'NR_IMOVEL': 1, 'SG_UF': 1})   
+        cibs_cafir = [doc['NR_IMOVEL'] for doc in docs]
+
+        docs = COLLECTION_AGRO.find({'UF': 'SC', 'CIB': {'$ne': None}}, {'_id': 0, 'CIB': 1, 'UF': 1})
+        cibs_cib = [doc['CIB'] for doc in docs]
+
+        # colleciton_error já é de SC
+        docs = COLLECTION_AGRO_ERROR.find({'CIB': {'$ne': None}}, {'_id': 0, 'CIB': 1})
+        cibs_error = [doc['CIB'] for doc in docs]
+
+        cibs_inserted = set(cibs_cib) | set(cibs_error)
+        cibs = list(set(cibs_cafir) - cibs_inserted)
+
+        print(f'{len(cibs)} cibs restantes')
+
         processo = acessar_site(url, processo=None)
+        #acessar_site_v2(url)
 
         for index, cib in enumerate(cibs):
+            #acessar_site_v2(url)
+
             data, texto = extract_cib(
                 cib, 
                 chrome=processo, 
@@ -402,10 +478,11 @@ def main():
             )
 
             if not data:
-                try:
-                    COLLECTION_AGRO_ERROR.insert_one({'CIB': cib, 'ERRO': texto})
-                except Exception as db_err:
-                    print(f"Erro ao registrar erro no banco para CIB {cib}: {db_err}")
+                if texto and not str(texto).lower().startswith('período'):
+                    try:
+                        COLLECTION_AGRO_ERROR.insert_one({'CIB': cib, 'ERRO': texto})
+                    except Exception as db_err:
+                        print(f"Erro ao registrar erro no banco para CIB {cib}: {db_err}")
             else:
                 try:
                     COLLECTION_AGRO_PDF.insert_one({'CPF_CNPJ': data['CPF_CNPJ'], 'PDF': data['PDF']})
@@ -414,8 +491,10 @@ def main():
                 except Exception as db_err:
                     print(f"Erro ao salvar dados no banco para CIB {cib}: {db_err}")
 
+
             if (index + 1) % 10 == 0 or not fazer_nova_consulta():
                 processo = acessar_site(url, processo=processo)
+                #acessar_site_v2(url)
 
     finally:
         # Fechar o processo do Chrome se ainda estiver aberto
@@ -439,4 +518,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    i = 1
+    while True:
+        try:
+            main()
+            i = 1
+        except:
+            time.sleep(60 * i)
+            i = i + 1

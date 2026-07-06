@@ -1,0 +1,2 @@
+query session
+tscon 3 /dest:console
